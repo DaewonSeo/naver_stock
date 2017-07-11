@@ -14,7 +14,7 @@ class Stocks():
 
     def get_code(self):
 
-        self.stocks = []
+        self.stocks = {}
         page_num = 27 # 코스피 27
 
         if self.stock_type:
@@ -30,18 +30,26 @@ class Stocks():
             stock_codes = soup.select('table.type_2 td a.tltle')
 
             for code in stock_codes:
-                self.stocks.append((code.text, code['href'].split('=')[-1])) # 리스트에 리스트 묶음 형태로 (종목명, 종목코드)
+                self.stocks[code.text] = code['href'].split('=')[-1] # 리스트에 리스트 묶음 형태로 (종목명, 종목코드)
 
 
         return self.stocks
 
 
-    def get_historical_data(self, date):
+    def get_historical_data(self, date, stocks=None):
 
         date = datetime.datetime.strptime(date, "%Y-%m-%d") # 원하는 날짜 선택 (지정 날짜부터 가장 최근 데이터까지 가져옴)
         page_num = 1
 
-        for name, code in self.stocks:
+        stocks_codes = {}
+        if stocks is not None:
+            for stock in stocks:
+                stocks_codes[stock] = self.stocks[stock]
+
+        else:
+            stocks_codes = self.stocks
+
+        for name, code in stocks_codes:
             while True:
                 url = 'http://finance.naver.com/item/sise_day.nhn?code={0}&page={1}'.format(code, page_num)
 
@@ -71,4 +79,32 @@ class Stocks():
                 page_num += 1
 
 
-        
+    def get_stock_infromation(self, stocks=None):
+
+        stocks_codes = {}
+
+        if stocks is not None:
+            for stock in stocks:
+                stocks_codes[stock] = self.stocks[stock]
+
+        else:
+            stocks_codes = self.stocks
+
+        for name, code in stocks_codes:
+
+            url = 'http://finance.naver.com/item/sise.nhn?code={}'.format(code)
+
+            req = requests.get(url)
+            html = req.text
+            soup = BeautifulSoup(html, 'html.parser')
+            print('{} 종목 정보를 가져오는 중입니다.'.format(name))
+            per_table = soup.select('#aside .aside_invest_info #tab_con1 .per_table')
+
+            krx_per = per_table[0].find('em', {'id': 'krx_per'}).text
+            cns_per = per_table[0].find('em', {'id': '_cns_per'}).text
+            # pbr = per_table[0].find('em', {'id': '_pbr'}).text  # 크롤링 동작시 무한대 표시가 리턴됨.
+            dvr = per_table[0].find('em', {'id': '_dvr'}).text
+
+            print(krx_per, cns_per, dvr)
+
+            return krx_per, cns_per, dvr
